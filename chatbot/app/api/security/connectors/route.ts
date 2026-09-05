@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/app/(auth)/auth";
 import {
   getConnectorStatuses,
+  isGoogleDriveConnected,
   syncConfiguredConnectors,
 } from "@/lib/security/connectors";
 
@@ -10,7 +11,9 @@ export async function GET() {
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  return NextResponse.json({ connectors: getConnectorStatuses() });
+  return NextResponse.json({
+    connectors: await getConnectorStatuses(await isGoogleDriveConnected()),
+  });
 }
 
 export async function POST() {

@@ -4,6 +4,7 @@ import { syncDemoSources } from "./ingestion";
 import {
   isGitHubConfigured,
   isGoogleDriveConfigured,
+  isGoogleDriveOAuthConfigured,
   isSlackConfigured,
   syncGitHub,
   syncGoogleDrive,
@@ -24,6 +25,7 @@ export type ConnectorStatus = {
   mode: "connected" | "ready" | "demo" | "needs_setup";
   readOnly: true;
   detail: string;
+  connectUrl?: string;
 };
 
 export const CONNECTORS: ConnectorStatus[] = [
@@ -63,6 +65,9 @@ export const CONNECTORS: ConnectorStatus[] = [
     mode: isGoogleDriveConfigured() ? "connected" : "needs_setup",
     name: "Google Drive",
     readOnly: true,
+    ...(isGoogleDriveOAuthConfigured()
+      ? { connectUrl: "/api/security/google-drive/connect" }
+      : {}),
   },
   {
     description:
@@ -75,9 +80,15 @@ export const CONNECTORS: ConnectorStatus[] = [
   },
 ];
 
-export function getConnectorStatuses() {
-  return CONNECTORS;
+export function getConnectorStatuses(googleDriveConnected = false) {
+  return CONNECTORS.map((connector) =>
+    connector.id === "google-drive" && googleDriveConnected
+      ? { ...connector, detail: "Connected", mode: "connected" as const }
+      : connector
+  );
 }
+
+export { isGoogleDriveConnected } from "./live-connectors";
 
 export async function syncConfiguredConnectors() {
   // Azure inventory is represented by the seeded read-only inventory until an Azure

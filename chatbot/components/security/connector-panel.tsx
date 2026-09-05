@@ -119,6 +119,14 @@ export function ConnectorPanel() {
                 {modeCopy[connector.mode]} ·{" "}
                 {connector.readOnly ? "read-only" : ""}
               </span>
+              {connector.connectUrl && connector.mode !== "connected" ? (
+                <a
+                  className="mt-1 inline-block text-[10px] font-medium text-foreground underline underline-offset-2"
+                  href={connector.connectUrl}
+                >
+                  Connect
+                </a>
+              ) : null}
             </span>
           </div>
         ))}
