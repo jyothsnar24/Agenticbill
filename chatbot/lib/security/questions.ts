@@ -606,6 +606,8 @@ const QUESTION_ID_ALIASES: Record<string, string> = {
   backups: "backups-performed",
   "backup-frequency-automation": "backups-performed",
   "backup-frequency-and-automation": "backups-performed",
+  "mfa-enabled-workforce-privileged": "mfa-enabled",
+  "mfa-enabled-workforce-privileged-access": "mfa-enabled",
   "customer-data-encryption": "customer-data-encryption-at-rest",
   "customer-data-storage": "customer-data-storage-location",
   "employee-offboarding-process": "employee-offboarding",

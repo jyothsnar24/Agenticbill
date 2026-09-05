@@ -19,7 +19,7 @@ import type { ClaimStatus, Evidence } from "@/lib/security/types";
 const evidenceSchema = z.object({
   excerpt: z.string(),
   id: z.string(),
-  relevance: z.number(),
+  relevance: z.number().min(0).max(1).optional(),
   sourceId: z.string(),
   sourceTitle: z.string(),
   sourceType: z.string(),
@@ -122,6 +122,10 @@ export const saveVerifiedSecurityClaim = tool({
   }) => {
     const canonicalQuestionId = normalizeQuestionId(questionId);
     const details = missingDetails ?? [];
+    const normalizedEvidence = evidence.map((item) => ({
+      ...item,
+      relevance: item.relevance ?? 0.5,
+    }));
     const openConflicts = await getConflicts();
     if (
       openConflicts.some(
@@ -138,7 +142,7 @@ export const saveVerifiedSecurityClaim = tool({
     const claim = await saveClaim({
       answer,
       confidence,
-      evidence: evidence as Evidence[],
+      evidence: normalizedEvidence as Evidence[],
       missingDetails: details,
       questionId: canonicalQuestionId,
       scope,
