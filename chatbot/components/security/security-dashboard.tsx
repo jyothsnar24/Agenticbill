@@ -59,21 +59,37 @@ export function SecurityDashboard() {
   const [profile, setProfile] = useState<ProfilePayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selectedQuestion, setSelectedQuestion] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const response = await fetch("/api/security/profile");
-    if (response.ok) {
+    try {
+      const response = await fetch("/api/security/profile");
+      if (!response.ok) {
+        throw new Error("The security profile could not be loaded.");
+      }
       setProfile((await response.json()) as ProfilePayload);
+      setError(null);
+    } catch {
+      setError("Security profile unavailable. Try refreshing.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   const sync = useCallback(async () => {
     setSyncing(true);
-    await fetch("/api/security/sync", { method: "POST" });
-    await refresh();
-    setSyncing(false);
+    try {
+      const response = await fetch("/api/security/sync", { method: "POST" });
+      if (!response.ok) {
+        throw new Error("Source sync failed");
+      }
+      await refresh();
+    } catch {
+      setError("Source sync failed. Try again.");
+    } finally {
+      setSyncing(false);
+    }
   }, [refresh]);
 
   useEffect(() => {
@@ -94,6 +110,10 @@ export function SecurityDashboard() {
   const handleSync = useCallback(() => {
     sync().catch(() => undefined);
   }, [sync]);
+
+  const handleRetry = useCallback(() => {
+    refresh().catch(() => undefined);
+  }, [refresh]);
 
   const handleQuestionSelect = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -121,6 +141,24 @@ export function SecurityDashboard() {
           <div className="h-24 rounded-xl bg-muted" />
           <div className="h-48 rounded-xl bg-muted" />
         </div>
+      </aside>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <aside className="hidden w-[340px] shrink-0 border-l bg-card/70 p-5 lg:block">
+        <p className="text-sm font-semibold">Security profile unavailable</p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          {error ?? "The evidence profile could not be loaded."}
+        </p>
+        <button
+          className="mt-4 rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-muted"
+          onClick={handleRetry}
+          type="button"
+        >
+          Try again
+        </button>
       </aside>
     );
   }
@@ -171,6 +209,11 @@ export function SecurityDashboard() {
         </button>
       </div>
       <ConnectorPanel />
+      {error ? (
+        <div className="border-b px-5 py-3 text-xs text-amber-700 dark:text-amber-300">
+          {error}
+        </div>
+      ) : null}
       {profile?.conflicts.length ? (
         <div className="border-b px-5 py-4">
           <div className="flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-300">
@@ -215,7 +258,10 @@ export function SecurityDashboard() {
                 </div>
                 {isSelected && question.claim ? (
                   <div className="mt-3 border-t pt-3 text-xs text-muted-foreground">
-                    <p className="leading-5">
+                    <p className="font-semibold text-foreground">
+                      Analyst finding
+                    </p>
+                    <p className="mt-1 leading-5">
                       {typeof question.claim.answer === "string"
                         ? question.claim.answer
                         : JSON.stringify(question.claim.answer)}
@@ -229,8 +275,20 @@ export function SecurityDashboard() {
                               className="rounded-lg bg-muted/50 p-2.5"
                               key={evidence.id}
                             >
-                              <p className="font-medium text-foreground">
-                                {evidence.sourceTitle}
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="font-semibold text-foreground">
+                                  Evidence ·{" "}
+                                  {evidence.sourceTitle || "Company source"}
+                                </p>
+                                <span className="shrink-0 text-[10px] uppercase tracking-wide">
+                                  {evidence.sourceType?.replaceAll("_", " ")}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-[10px] text-muted-foreground">
+                                {evidence.reliability} reliability
+                                {evidence.location
+                                  ? ` · ${evidence.location}`
+                                  : ""}
                               </p>
                               <p className="mt-1 line-clamp-3 leading-4">
                                 {evidence.excerpt}
@@ -238,7 +296,13 @@ export function SecurityDashboard() {
                             </div>
                           ))}
                       </div>
-                    ) : null}
+                    ) : (
+                      <p className="mt-3 rounded-lg bg-sky-500/10 p-2.5 text-sky-700 dark:text-sky-300">
+                        {question.claim.status === "user_confirmed"
+                          ? "Confirmed by the employee; no document citation attached."
+                          : "No direct company citation attached. This answer needs confirmation."}
+                      </p>
+                    )}
                   </div>
                 ) : null}
               </button>

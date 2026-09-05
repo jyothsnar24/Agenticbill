@@ -21,6 +21,7 @@ export function ConnectorPanel() {
   const [connectors, setConnectors] = useState<ConnectorStatus[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -30,6 +31,9 @@ export function ConnectorPanel() {
         ((await response.json()) as { connectors: ConnectorStatus[] })
           .connectors
       );
+      setError(null);
+    } else {
+      setError("Sources unavailable. Try again.");
     }
   }, []);
 
@@ -39,9 +43,19 @@ export function ConnectorPanel() {
 
   const sync = useCallback(async () => {
     setSyncing(true);
-    await fetch("/api/security/connectors", { method: "POST" });
-    await load();
-    setSyncing(false);
+    try {
+      const response = await fetch("/api/security/connectors", {
+        method: "POST",
+      });
+      if (!response.ok) {
+        throw new Error("Connector sync failed");
+      }
+      await load();
+    } catch {
+      setError("Sync failed. Try again.");
+    } finally {
+      setSyncing(false);
+    }
   }, [load]);
 
   const upload = useCallback(
@@ -49,9 +63,21 @@ export function ConnectorPanel() {
       setUploading(true);
       const formData = new FormData();
       formData.set("file", file);
-      await fetch("/api/security/upload", { body: formData, method: "POST" });
-      setUploading(false);
-      await load();
+      try {
+        const response = await fetch("/api/security/upload", {
+          body: formData,
+          method: "POST",
+        });
+        if (!response.ok) {
+          throw new Error("Evidence upload failed");
+        }
+        setError(null);
+        await load();
+      } catch {
+        setError("Evidence upload failed. Check the file and try again.");
+      } finally {
+        setUploading(false);
+      }
     },
     [load]
   );
@@ -81,7 +107,7 @@ export function ConnectorPanel() {
         <div>
           <p className="text-xs font-semibold">Evidence sources</p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
-            Read-only connections
+            Company evidence · read-only
           </p>
         </div>
         <button
@@ -96,6 +122,11 @@ export function ConnectorPanel() {
           />
         </button>
       </div>
+      {error ? (
+        <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-300">
+          {error}
+        </p>
+      ) : null}
       <div className="mt-3 space-y-2">
         {connectors.map((connector) => (
           <div

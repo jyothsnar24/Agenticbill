@@ -18,11 +18,23 @@ export const myProvider = isTestEnvironment
     })()
   : null;
 
-const azure = process.env.AZURE_OPENAI_ENDPOINT
+const configuredChatEndpoint =
+  process.env.AZURE_OPENAI_CHAT_DEPLOYMENT?.startsWith("http")
+    ? process.env.AZURE_OPENAI_CHAT_DEPLOYMENT
+    : undefined;
+
+const azureEndpoint = (
+  configuredChatEndpoint ?? process.env.AZURE_OPENAI_ENDPOINT
+)
+  ?.replace(/\/$/, "")
+  .replace(/\/openai\/v1$/, "")
+  .replace(/\/openai$/, "");
+
+const azure = azureEndpoint
   ? createAzure({
       apiKey: process.env.AZURE_OPENAI_API_KEY,
       apiVersion: process.env.AZURE_OPENAI_API_VERSION ?? "2025-04-01-preview",
-      baseURL: `${process.env.AZURE_OPENAI_ENDPOINT.replace(/\/$/, "")}/openai`,
+      baseURL: `${azureEndpoint}/openai`,
       useDeploymentBasedUrls: true,
     })
   : null;
@@ -33,11 +45,7 @@ export function getLanguageModel(modelId: string) {
   }
 
   if (azure) {
-    return azure.chat(
-      modelId === "security-chat-advanced"
-        ? (process.env.AZURE_OPENAI_CHAT_DEPLOYMENT ?? "security-chat-advanced")
-        : (process.env.AZURE_OPENAI_FALLBACK_CHAT_DEPLOYMENT ?? "security-chat")
-    );
+    return azure.chat("model-router");
   }
 
   return gateway.languageModel(modelId);
@@ -48,9 +56,7 @@ export function getTitleModel() {
     return myProvider.languageModel("title-model");
   }
   if (azure) {
-    return azure.chat(
-      process.env.AZURE_OPENAI_FALLBACK_CHAT_DEPLOYMENT ?? "security-chat"
-    );
+    return azure.chat("model-router");
   }
   return gateway.languageModel(titleModel.id);
 }

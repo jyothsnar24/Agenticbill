@@ -1,5 +1,6 @@
 import "server-only";
 
+import { startEmbeddingBackfill } from "./embedding-jobs";
 import { syncDemoSources } from "./ingestion";
 import {
   isGitHubConfigured,
@@ -100,5 +101,9 @@ export async function syncConfiguredConnectors() {
     syncGoogleDrive(),
     syncGitHub(),
   ]);
-  return { ...demo, connectors };
+  return {
+    ...demo,
+    connectors,
+    embeddingBackfill: startEmbeddingBackfill(),
+  };
 }

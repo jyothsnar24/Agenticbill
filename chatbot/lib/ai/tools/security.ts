@@ -1,6 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 import {
+  getConflicts,
   getProfile,
   saveClaim,
   saveConflict,
@@ -52,8 +53,13 @@ export const searchCompanyKnowledge = tool({
 
 export const getSecurityProfile = tool({
   description:
-    "Read the current persistent security profile and open conflicts. Use this to avoid asking the same question twice.",
-  execute: async () => ({ claims: await getProfile() }),
+    "Read the current persistent security profile and open conflicts. Use this to avoid asking the same question twice. After reading it, continue the investigation by searching company knowledge for the user's question; do not stop after this tool.",
+  execute: async () => ({
+    claims: await getProfile(),
+    conflicts: await getConflicts(),
+    nextStep:
+      "Continue now: searchCompanyKnowledge for the user's question before answering.",
+  }),
   inputSchema: z.object({}),
 });
 
@@ -104,6 +110,19 @@ export const saveVerifiedSecurityClaim = tool({
     evidence,
   }) => {
     const canonicalQuestionId = normalizeQuestionId(questionId);
+    const openConflicts = await getConflicts();
+    if (
+      openConflicts.some(
+        (conflict) => conflict.question_id === canonicalQuestionId
+      )
+    ) {
+      return {
+        error:
+          "An unresolved company evidence conflict exists for this question. Ask the user for clarification before verifying it.",
+        saved: false,
+        status: "conflict",
+      };
+    }
     const claim = await saveClaim({
       answer,
       confidence,

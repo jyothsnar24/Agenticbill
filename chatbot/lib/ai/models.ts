@@ -1,10 +1,10 @@
-export const DEFAULT_CHAT_MODEL = "security-chat-advanced";
+export const DEFAULT_CHAT_MODEL = "model-router";
 
 export const titleModel = {
   description: "Fast model for title generation",
   gatewayOrder: ["fireworks", "bedrock"],
-  id: "security-chat",
-  name: "Security Chat",
+  id: "model-router",
+  name: "Security Analyst",
   provider: "azure",
 };
 
@@ -25,15 +25,9 @@ export type ChatModel = {
 
 export const chatModels: ChatModel[] = [
   {
-    description: "Best available model for evidence analysis",
-    id: "security-chat-advanced",
-    name: "Security Analyst Pro",
-    provider: "azure",
-  },
-  {
-    description: "Fast fallback model for local development",
-    id: "security-chat",
-    name: "Security Analyst Fast",
+    description: "Reliable Azure model for evidence analysis",
+    id: "model-router",
+    name: "Security Analyst",
     provider: "azure",
   },
 ];

@@ -8,7 +8,7 @@ export const Greeting = () => (
       initial={{ opacity: 0, y: 10 }}
       transition={{ delay: 0.35, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
     >
-      Build your security picture
+      AI Security Analyst
     </motion.div>
     <motion.div
       animate={{ opacity: 1, y: 0 }}
@@ -16,8 +16,8 @@ export const Greeting = () => (
       initial={{ opacity: 0, y: 10 }}
       transition={{ delay: 0.5, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
     >
-      I’ll search your company evidence first, surface conflicts, and ask only
-      what’s missing.
+      I’ll search company evidence first, cite supported answers, and ask only
+      what is missing or unclear.
     </motion.div>
   </div>
 );

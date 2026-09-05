@@ -50,6 +50,11 @@ import {
 import type { DBMessage } from "@/lib/db/schema";
 import { ChatbotError } from "@/lib/errors";
 import { checkIpRateLimit } from "@/lib/ratelimit";
+import {
+  getConflicts,
+  getProfile,
+  searchSecurityKnowledge as searchSecurityEvidence,
+} from "@/lib/security/db";
 import type { ChatMessage, WaitingStatusData } from "@/lib/types";
 import { convertToUIMessages, generateUUID } from "@/lib/utils";
 import { generateTitleFromUserMessage } from "../../actions";
@@ -210,6 +215,56 @@ export async function POST(request: Request) {
 
     const modelMessages = await convertToModelMessages(uiMessages);
 
+    const securityQuery = uiMessages
+      .filter((item) => item.role === "user")
+      .flatMap((item) =>
+        item.parts
+          .filter((part) => part.type === "text")
+          .map((part) => part.text)
+      )
+      .join(" ")
+      .slice(-2400);
+    const isSecurityQuestion =
+      /mfa|multi-factor|customer data|encrypt|backup|vulnerability|production|offboard|background check|security questionnaire/i.test(
+        securityQuery
+      );
+    let securityContext = "";
+    if (isSecurityQuestion && !isToolApprovalFlow) {
+      const contextPromise = Promise.all([
+        getProfile(),
+        getConflicts(),
+        searchSecurityEvidence(securityQuery),
+      ]).then(([profile, conflicts, evidence]) => ({
+        conflicts,
+        evidence,
+        profile,
+      }));
+      const context = await Promise.race([
+        contextPromise,
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+      ]);
+      if (context) {
+        securityContext = `\n\nPRECOMPUTED COMPANY SECURITY CONTEXT (use this before answering):\n${JSON.stringify(
+          {
+            conflicts: context.conflicts,
+            evidence: context.evidence.slice(0, 8).map((item) => ({
+              excerpt: item.excerpt.slice(0, 900),
+              id: item.id,
+              relevance: item.relevance,
+              reliability: item.reliability,
+              sourceId: item.sourceId,
+              sourceTitle: item.sourceTitle,
+              sourceType: item.sourceType,
+            })),
+            profile: context.profile,
+          }
+        )}\nUse only this evidence or ask one focused follow-up. Do not guess.`;
+      } else {
+        securityContext =
+          "\n\nEvidence lookup timed out. State that the answer is unknown and ask one focused follow-up; do not guess.";
+      }
+    }
+
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
         const modelName = modelConfig?.name ?? chatModel;
@@ -278,20 +333,26 @@ export async function POST(request: Request) {
           activeTools:
             isReasoningModel && !supportsTools
               ? []
-              : [
-                  "getWeather",
-                  "createDocument",
-                  "editDocument",
-                  "updateDocument",
-                  "requestSuggestions",
-                  "searchCompanyKnowledge",
-                  "getSecurityProfile",
-                  "syncCompanySources",
-                  "saveSecurityConfirmation",
-                  "saveVerifiedSecurityClaim",
-                  "recordSecurityConflict",
-                ],
-          instructions: systemPrompt({ requestHints, supportsTools }),
+              : isSecurityQuestion
+                ? [
+                    "saveSecurityConfirmation",
+                    "saveVerifiedSecurityClaim",
+                    "recordSecurityConflict",
+                  ]
+                : [
+                    "getWeather",
+                    "createDocument",
+                    "editDocument",
+                    "updateDocument",
+                    "requestSuggestions",
+                    "searchCompanyKnowledge",
+                    "getSecurityProfile",
+                    "syncCompanySources",
+                    "saveSecurityConfirmation",
+                    "saveVerifiedSecurityClaim",
+                    "recordSecurityConflict",
+                  ],
+          instructions: `${systemPrompt({ requestHints, supportsTools })}${securityContext}`,
           messages: modelMessages,
           model: getLanguageModel(chatModel),
           onAbort() {

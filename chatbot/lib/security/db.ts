@@ -112,12 +112,49 @@ function toVector(values: number[]) {
   return `[${values.join(",")}]`;
 }
 
+function sourceMetadata(source: CanonicalSource) {
+  if (source.metadata && Object.keys(source.metadata).length > 0) {
+    return source.metadata;
+  }
+  return {
+    connector: "local-seed",
+    externalId: source.externalId,
+    sourceType: source.sourceType,
+  };
+}
+
+const sourceLocks = new Map<string, Promise<void>>();
+
 export async function upsertSource(
+  source: CanonicalSource,
+  chunks: { content: string; embedding?: number[] }[]
+) {
+  const previous = sourceLocks.get(source.externalId) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const queued = previous.then(() => current);
+  sourceLocks.set(source.externalId, queued);
+
+  await previous;
+  try {
+    return await upsertSourceUnlocked(source, chunks);
+  } finally {
+    release();
+    if (sourceLocks.get(source.externalId) === queued) {
+      sourceLocks.delete(source.externalId);
+    }
+  }
+}
+
+async function upsertSourceUnlocked(
   source: CanonicalSource,
   chunks: { content: string; embedding?: number[] }[]
 ) {
   await ensureSecuritySchema();
   const contentHash = sha256(source.content);
+  const metadata = sourceMetadata(source);
   const metadataHash = sha256({
     author: source.author,
     effectiveFrom: source.effectiveFrom,
@@ -125,7 +162,7 @@ export async function upsertSource(
     reliability: source.reliability,
     scope: source.scope,
     sourceDate: source.sourceDate,
-    sourceMetadata: source.metadata,
+    sourceMetadata: metadata,
     sourceType: source.sourceType,
     title: source.title,
   });
@@ -167,7 +204,7 @@ export async function upsertSource(
       : null,
     external_id: source.externalId,
     id: sourceId,
-    metadata: sql.json((source.metadata ?? {}) as any),
+    metadata: sql.json(metadata as any),
     metadata_hash: metadataHash,
     reliability: source.reliability,
     scope: source.scope ?? null,
@@ -183,7 +220,7 @@ export async function upsertSource(
         ? sql.unsafe(`'${toVector(chunk.embedding)}'::vector`)
         : sql`NULL`;
       await sql`INSERT INTO security_chunks (id, source_id, chunk_index, content, chunk_hash, embedding, embedding_model, metadata, source_type, title, scope, reliability, source_date)
-      VALUES (${nanoid(16)}, ${sourceId}, ${index}, ${chunk.content}, ${chunkHash}, ${embedding}, ${chunk.embedding ? (process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT ?? "text-embedding-3-small") : null}, ${sql.json((source.metadata ?? {}) as any)}, ${source.sourceType}, ${source.title}, ${source.scope ?? null}, ${source.reliability}, ${source.sourceDate ? new Date(source.sourceDate) : null})`;
+      VALUES (${nanoid(16)}, ${sourceId}, ${index}, ${chunk.content}, ${chunkHash}, ${embedding}, ${chunk.embedding ? (process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT ?? "text-embedding-3-small") : null}, ${sql.json(metadata as any)}, ${source.sourceType}, ${source.title}, ${source.scope ?? null}, ${source.reliability}, ${source.sourceDate ? new Date(source.sourceDate) : null})`;
     })
   );
   return { changed: true, sourceId };
@@ -249,6 +286,50 @@ export async function searchSecurityKnowledge(
   }));
 }
 
+export async function backfillMissingEmbeddings(
+  onProgress?: (progress: { completed: number; total: number }) => void
+) {
+  await ensureSecuritySchema();
+  const rows = await sql`
+    SELECT c.id, c.content
+    FROM security_chunks c
+    JOIN security_sources s ON s.id = c.source_id AND s.is_current = true
+    WHERE c.is_current = true AND c.embedding IS NULL
+    ORDER BY c.created_at, c.chunk_index
+  `;
+  const total = rows.length;
+  let completed = 0;
+  onProgress?.({ completed, total });
+
+  for (let index = 0; index < rows.length; index += 16) {
+    const batch = rows.slice(index, index + 16);
+    // biome-ignore lint/performance/noAwaitInLoops: batches must remain sequential for Azure rate limiting.
+    const embeddings = await embedTexts(
+      batch.map((row) => row.content as string)
+    );
+    if (embeddings.length !== batch.length) {
+      throw new Error("Embedding queue returned an incomplete batch");
+    }
+    await Promise.all(
+      batch.map((row, batchIndex) => {
+        const embedding = sql.unsafe(
+          `'${toVector(embeddings[batchIndex])}'::vector`
+        );
+        return sql`
+          UPDATE security_chunks
+          SET embedding = ${embedding},
+              embedding_model = ${process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT ?? "security-embeddings"}
+          WHERE id = ${row.id} AND is_current = true AND embedding IS NULL
+        `;
+      })
+    );
+    completed += batch.length;
+    onProgress?.({ completed, total });
+  }
+
+  return { completed, total };
+}
+
 export async function saveClaim(
   input: Omit<SecurityClaim, "id" | "version" | "updatedAt">
 ) {
@@ -290,8 +371,35 @@ export async function saveClaim(
 
 export async function getProfile() {
   await ensureSecuritySchema();
-  const rows =
-    await sql`SELECT c.*, COALESCE(json_agg(json_build_object('id', e.id, 'sourceId', e.source_id, 'excerpt', e.excerpt, 'relevance', e.relevance)) FILTER (WHERE e.id IS NOT NULL), '[]'::json) AS evidence FROM security_claims c LEFT JOIN security_claim_evidence e ON e.claim_id = c.id WHERE c.is_current = true GROUP BY c.id ORDER BY c.updated_at DESC`;
+  const conflicts = await getConflicts();
+  const conflictedQuestionIds = new Set(
+    conflicts.map((conflict) => conflict.question_id as string)
+  );
+  const rows = await sql`SELECT c.*,
+      COALESCE(
+        json_agg(
+          json_build_object(
+            'id', e.id,
+            'sourceId', COALESCE(e.source_id, ch.source_id),
+            'sourceTitle', COALESCE(ch.title, s.title, 'Company source'),
+            'sourceType', COALESCE(ch.source_type, s.source_type, 'policy'),
+            'excerpt', e.excerpt,
+            'location', e.location,
+            'sourceDate', COALESCE(ch.source_date, s.source_date),
+            'reliability', COALESCE(ch.reliability, s.reliability, 'medium'),
+            'relevance', e.relevance,
+            'metadata', COALESCE(ch.metadata, s.metadata, '{}'::jsonb)
+          )
+        ) FILTER (WHERE e.id IS NOT NULL),
+        '[]'::json
+      ) AS evidence
+    FROM security_claims c
+    LEFT JOIN security_claim_evidence e ON e.claim_id = c.id
+    LEFT JOIN security_chunks ch ON ch.id = e.chunk_id
+    LEFT JOIN security_sources s ON s.id = COALESCE(e.source_id, ch.source_id)
+    WHERE c.is_current = true
+    GROUP BY c.id
+    ORDER BY c.updated_at DESC`;
   return rows.map((row) => ({
     answer: row.answer,
     confidence: Number(row.confidence),
@@ -300,7 +408,9 @@ export async function getProfile() {
     missingDetails: (row.missing_details ?? []) as string[],
     questionId: row.question_id as string,
     scope: row.scope as string | undefined,
-    status: row.status as SecurityClaim["status"],
+    status: conflictedQuestionIds.has(row.question_id as string)
+      ? "conflict"
+      : (row.status as SecurityClaim["status"]),
     updatedAt: new Date(row.updated_at as string).toISOString(),
     version: Number(row.version),
   }));

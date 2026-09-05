@@ -13,8 +13,8 @@ export const guestRegex = /^guest-\d+$/;
 export const DUMMY_PASSWORD = generateDummyPassword();
 
 export const suggestions = [
-  "Is multi-factor authentication enabled for all employees and contractors?",
-  "Where is customer data stored, and is it encrypted at rest?",
-  "How often are backups performed, and are restores tested?",
-  "Who has access to production, and is there an offboarding process?",
+  "Investigate MFA coverage",
+  "Complete the security questionnaire",
+  "Show open conflicts",
+  "What evidence is still missing?",
 ];

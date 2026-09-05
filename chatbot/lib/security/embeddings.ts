@@ -1,5 +1,31 @@
 import "server-only";
 
+let embeddingQueue = Promise.resolve();
+
+function enqueue<T>(task: () => Promise<T>) {
+  const next = embeddingQueue.then(task, task);
+  embeddingQueue = next.then(
+    () => undefined,
+    () => undefined
+  );
+  return next;
+}
+
+function retryDelay(response: Response, attempt: number) {
+  const retryAfterMs = Number(response.headers.get("retry-after-ms"));
+  const retryAfterSeconds = Number(response.headers.get("retry-after"));
+  const resetSeconds = Number(response.headers.get("x-ratelimit-reset-tokens"));
+  const headerDelay =
+    Number.isFinite(retryAfterMs) && retryAfterMs > 0
+      ? retryAfterMs
+      : Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+        ? retryAfterSeconds * 1000
+        : Number.isFinite(resetSeconds) && resetSeconds > 0
+          ? resetSeconds * 1000
+          : 1500 * (attempt + 1);
+  return Math.min(Math.max(headerDelay, 1000) + Math.random() * 250, 120_000);
+}
+
 export function embedTexts(input: string[]): Promise<number[][]> {
   if (!input.length) {
     return Promise.resolve([]);
@@ -32,13 +58,14 @@ export function embedTexts(input: string[]): Promise<number[][]> {
         method: "POST",
       }
     );
-    if (response.status === 429 && attempt < 5) {
-      const retryAfter = Number(response.headers.get("retry-after-ms"));
-      const delay =
-        Number.isFinite(retryAfter) && retryAfter > 0
-          ? retryAfter
-          : 1500 * (attempt + 1);
-      await new Promise((resolve) => setTimeout(resolve, delay));
+    const retryable = [429, 502, 503, 504].includes(response.status);
+    // A missing deployment should fall back to full-text retrieval quickly;
+    // repeatedly waiting on a 404 can consume the entire chat request window.
+    const deploymentNotReady = response.status === 404 && attempt < 1;
+    if ((retryable || deploymentNotReady) && attempt < 12) {
+      await new Promise((resolve) =>
+        setTimeout(resolve, retryDelay(response, attempt))
+      );
       return embedBatch(batch, attempt + 1);
     }
     return response;
@@ -46,7 +73,7 @@ export function embedTexts(input: string[]): Promise<number[][]> {
   return batches.reduce(
     async (promise, batch) => {
       const results = await promise;
-      const response = await embedBatch(batch);
+      const response = await enqueue(() => embedBatch(batch));
       if (!response.ok) {
         throw new Error(`Embedding request failed: ${response.status}`);
       }
