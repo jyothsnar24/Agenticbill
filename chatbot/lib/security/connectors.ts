@@ -1,6 +1,14 @@
 import "server-only";
 
 import { syncDemoSources } from "./ingestion";
+import {
+  isGitHubConfigured,
+  isGoogleDriveConfigured,
+  isSlackConfigured,
+  syncGitHub,
+  syncGoogleDrive,
+  syncSlack,
+} from "./live-connectors";
 
 export type ConnectorId =
   | "company-files"
@@ -13,7 +21,7 @@ export type ConnectorStatus = {
   id: ConnectorId;
   name: string;
   description: string;
-  mode: "ready" | "demo" | "needs_setup";
+  mode: "connected" | "ready" | "demo" | "needs_setup";
   readOnly: true;
   detail: string;
 };
@@ -40,26 +48,28 @@ export const CONNECTORS: ConnectorStatus[] = [
   {
     description:
       "Find operational messages, access exceptions, and offboarding evidence.",
-    detail: "OAuth connection required",
+    detail: isSlackConfigured() ? "Connected" : "OAuth connection required",
     id: "slack",
-    mode: "needs_setup",
+    mode: isSlackConfigured() ? "connected" : "needs_setup",
     name: "Slack",
     readOnly: true,
   },
   {
     description: "Sync policies and security documents from a selected folder.",
-    detail: "OAuth connection required",
+    detail: isGoogleDriveConfigured()
+      ? "Connected"
+      : "OAuth connection required",
     id: "google-drive",
-    mode: "needs_setup",
+    mode: isGoogleDriveConfigured() ? "connected" : "needs_setup",
     name: "Google Drive",
     readOnly: true,
   },
   {
     description:
       "Verify repository access, branch protection, and security settings.",
-    detail: "App connection required",
+    detail: isGitHubConfigured() ? "Connected" : "App connection required",
     id: "github",
-    mode: "needs_setup",
+    mode: isGitHubConfigured() ? "connected" : "needs_setup",
     name: "GitHub",
     readOnly: true,
   },
@@ -69,9 +79,15 @@ export function getConnectorStatuses() {
   return CONNECTORS;
 }
 
-export function syncConfiguredConnectors() {
+export async function syncConfiguredConnectors() {
   // Azure inventory is represented by the seeded read-only inventory until an Azure
   // service principal is configured. The connector contract stays identical when
   // live resource-manager reads are enabled.
-  return syncDemoSources();
+  const demo = await syncDemoSources();
+  const connectors = await Promise.all([
+    syncSlack(),
+    syncGoogleDrive(),
+    syncGitHub(),
+  ]);
+  return { ...demo, connectors };
 }

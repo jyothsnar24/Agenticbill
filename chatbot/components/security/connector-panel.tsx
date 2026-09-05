@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ConnectorStatus } from "@/lib/security/connectors";
 
 const modeCopy = {
+  connected: "Connected",
   demo: "Demo data",
   needs_setup: "Not connected",
   ready: "Ready",
