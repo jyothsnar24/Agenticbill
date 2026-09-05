@@ -14,6 +14,7 @@ import type {
   QuestionnaireQuestion,
   SecurityClaim,
 } from "@/lib/security/types";
+import { ConnectorPanel } from "./connector-panel";
 
 type ProfilePayload = {
   questions: (QuestionnaireQuestion & { claim: SecurityClaim | null })[];
@@ -169,6 +170,7 @@ export function SecurityDashboard() {
           Download questionnaire
         </button>
       </div>
+      <ConnectorPanel />
       {profile?.conflicts.length ? (
         <div className="border-b px-5 py-4">
           <div className="flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-300">

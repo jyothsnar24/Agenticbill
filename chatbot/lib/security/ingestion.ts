@@ -46,3 +46,17 @@ export async function syncDemoSources(
     total: sources.length,
   };
 }
+
+export async function ingestSource(source: CanonicalSource) {
+  const chunks = chunkText(source.content);
+  let embeddings: number[][] = [];
+  try {
+    embeddings = await embedTexts(chunks);
+  } catch {
+    embeddings = [];
+  }
+  return upsertSource(
+    source,
+    chunks.map((content, index) => ({ content, embedding: embeddings[index] }))
+  );
+}

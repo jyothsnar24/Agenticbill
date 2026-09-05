@@ -1,0 +1,77 @@
+import "server-only";
+
+import { syncDemoSources } from "./ingestion";
+
+export type ConnectorId =
+  | "company-files"
+  | "azure"
+  | "slack"
+  | "google-drive"
+  | "github";
+
+export type ConnectorStatus = {
+  id: ConnectorId;
+  name: string;
+  description: string;
+  mode: "ready" | "demo" | "needs_setup";
+  readOnly: true;
+  detail: string;
+};
+
+export const CONNECTORS: ConnectorStatus[] = [
+  {
+    description:
+      "Upload policies, questionnaires, CSVs, and infrastructure exports.",
+    detail: "Ready for upload",
+    id: "company-files",
+    mode: "ready",
+    name: "Company files",
+    readOnly: true,
+  },
+  {
+    description:
+      "Collect resource, identity, backup, and vulnerability evidence.",
+    detail: "Demo inventory enabled",
+    id: "azure",
+    mode: "demo",
+    name: "Azure infrastructure",
+    readOnly: true,
+  },
+  {
+    description:
+      "Find operational messages, access exceptions, and offboarding evidence.",
+    detail: "OAuth connection required",
+    id: "slack",
+    mode: "needs_setup",
+    name: "Slack",
+    readOnly: true,
+  },
+  {
+    description: "Sync policies and security documents from a selected folder.",
+    detail: "OAuth connection required",
+    id: "google-drive",
+    mode: "needs_setup",
+    name: "Google Drive",
+    readOnly: true,
+  },
+  {
+    description:
+      "Verify repository access, branch protection, and security settings.",
+    detail: "App connection required",
+    id: "github",
+    mode: "needs_setup",
+    name: "GitHub",
+    readOnly: true,
+  },
+];
+
+export function getConnectorStatuses() {
+  return CONNECTORS;
+}
+
+export function syncConfiguredConnectors() {
+  // Azure inventory is represented by the seeded read-only inventory until an Azure
+  // service principal is configured. The connector contract stays identical when
+  // live resource-manager reads are enabled.
+  return syncDemoSources();
+}
