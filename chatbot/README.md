@@ -1,20 +1,13 @@
-<a href="https://chatbot.ai-sdk.dev/demo">
-  <img alt="Chatbot" src="app/(chat)/opengraph-image.png">
-  <h1 align="center">Chatbot</h1>
-</a>
+# Agenticbill — AI Security Analyst (chatbot app)
 
-<p align="center">
-    Chatbot (formerly AI Chatbot) is a free, open-source template built with Next.js and the AI SDK that helps you quickly build powerful chatbot applications.
-</p>
+This is the Next.js/AI SDK chatbot application for the Agenticbill AI Security
+Analyst — see the [project-level README](../README.md) for the problem
+statement, tech stack, and how it all fits together.
 
-<p align="center">
-  <a href="https://chatbot.ai-sdk.dev/docs"><strong>Read Docs</strong></a> ·
-  <a href="#features"><strong>Features</strong></a> ·
-  <a href="#model-providers"><strong>Model Providers</strong></a> ·
-  <a href="#deploy-your-own"><strong>Deploy Your Own</strong></a> ·
-  <a href="#running-locally"><strong>Running locally</strong></a>
-</p>
-<br/>
+This app started from the [Vercel AI Chatbot](https://chatbot.ai-sdk.dev)
+template; everything below this point is inherited setup/run documentation
+from that template and is still accurate for getting the app running
+locally.
 
 ## Features
 
