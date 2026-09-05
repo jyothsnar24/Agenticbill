@@ -242,7 +242,7 @@ export async function POST(request: Request) {
       }));
       const context = await Promise.race([
         contextPromise,
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
       ]);
       if (context) {
         securityContext = `\n\nPRECOMPUTED COMPANY SECURITY CONTEXT (use this before answering):\n${JSON.stringify(
@@ -336,6 +336,8 @@ export async function POST(request: Request) {
               ? []
               : isSecurityQuestion
                 ? [
+                    "searchCompanyKnowledge",
+                    "getSecurityProfile",
                     "saveSecurityConfirmation",
                     "saveVerifiedSecurityClaim",
                     "recordSecurityConflict",

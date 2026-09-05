@@ -177,3 +177,12 @@ After the hackathon:
    security settings, and clear the app's refresh-token cookie.
 3. Remove local `.env.local` values and any temporary OAuth state.
 4. Keep the GitHub documentation and source code; do not keep provider keys.
+
+## Teardown record
+
+- The dedicated Azure resource group `hackathon-ai-rg` and its hackathon
+  resources were deleted after the demo.
+- The Google Drive disconnect workflow is implemented at
+  `/api/security/google-drive/disconnect`; it revokes the current OAuth grant
+  and clears the local connector cookies when triggered from the connected
+  browser.

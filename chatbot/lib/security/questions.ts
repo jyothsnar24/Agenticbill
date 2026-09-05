@@ -604,6 +604,8 @@ export const SUPPLEMENTAL_SECURITY_QUESTIONS: QuestionnaireQuestion[] = [
 
 const QUESTION_ID_ALIASES: Record<string, string> = {
   backups: "backups-performed",
+  "backup-frequency-automation": "backups-performed",
+  "backup-frequency-and-automation": "backups-performed",
   "customer-data-encryption": "customer-data-encryption-at-rest",
   "customer-data-storage": "customer-data-storage-location",
   "employee-offboarding-process": "employee-offboarding",

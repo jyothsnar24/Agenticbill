@@ -79,12 +79,13 @@ export const saveSecurityConfirmation = tool({
     "Save a user's direct confirmation or correction for a security questionnaire question. Preserve existing evidence, classify this as user confirmed, and resolve an open conflict when the confirmation has no missing details.",
   execute: async ({ questionId, answer, note, missingDetails }) => {
     const canonicalQuestionId = normalizeQuestionId(questionId);
+    const details = missingDetails ?? [];
     const question = getQuestion(canonicalQuestionId);
     if (!question) {
       return { error: "Unknown questionnaire question", saved: false };
     }
     await saveUserFact(canonicalQuestionId, answer, note);
-    if (missingDetails.length === 0) {
+    if (details.length === 0) {
       await resolveConflicts(
         canonicalQuestionId,
         note ?? "Resolved by the user's current confirmation."
@@ -92,11 +93,11 @@ export const saveSecurityConfirmation = tool({
     }
     const claim = await saveClaim({
       answer,
-      confidence: missingDetails.length > 0 ? 0.65 : 0.82,
+      confidence: details.length > 0 ? 0.65 : 0.82,
       evidence: [],
-      missingDetails,
+      missingDetails: details,
       questionId: canonicalQuestionId,
-      status: missingDetails.length > 0 ? "partial" : "user_confirmed",
+      status: details.length > 0 ? "partial" : "user_confirmed",
     });
     return { claim, saved: true };
   },
@@ -120,6 +121,7 @@ export const saveVerifiedSecurityClaim = tool({
     evidence,
   }) => {
     const canonicalQuestionId = normalizeQuestionId(questionId);
+    const details = missingDetails ?? [];
     const openConflicts = await getConflicts();
     if (
       openConflicts.some(
@@ -137,10 +139,10 @@ export const saveVerifiedSecurityClaim = tool({
       answer,
       confidence,
       evidence: evidence as Evidence[],
-      missingDetails,
+      missingDetails: details,
       questionId: canonicalQuestionId,
       scope,
-      status: missingDetails.length > 0 ? "partial" : "verified",
+      status: details.length > 0 ? "partial" : "verified",
     });
     return { claim, saved: true };
   },
