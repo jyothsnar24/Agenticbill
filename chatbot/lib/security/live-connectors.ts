@@ -1,5 +1,9 @@
 import "server-only";
 
+import { execFile } from "node:child_process";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { promisify } from "node:util";
 import { cookies } from "next/headers";
 import { ingestSource } from "./ingestion";
 import type { CanonicalSource } from "./types";
@@ -7,6 +11,7 @@ import type { CanonicalSource } from "./types";
 const GOOGLE_DRIVE_REFRESH_COOKIE = "security_google_drive_refresh_token";
 const GOOGLE_DRIVE_STATE_COOKIE = "security_google_drive_oauth_state";
 const GOOGLE_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
+const execFileAsync = promisify(execFile);
 
 async function readJson<T>(url: string, headers: HeadersInit) {
   const response = await fetch(url, { cache: "no-store", headers });
@@ -201,6 +206,52 @@ type DriveFile = {
   modifiedTime?: string;
 };
 
+async function downloadDriveContent(file: DriveFile, headers: HeadersInit) {
+  const exportPath =
+    file.mimeType === "application/vnd.google-apps.document"
+      ? "/export?mimeType=text/plain"
+      : file.mimeType === "application/vnd.google-apps.spreadsheet"
+        ? "/export?format=csv"
+        : "?alt=media";
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${file.id}${exportPath}`,
+    { cache: "no-store", headers }
+  );
+  if (!response.ok) {
+    return null;
+  }
+  if (
+    file.mimeType !==
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  ) {
+    const content = (await response.text()).trim();
+    return content || null;
+  }
+  const temporaryDirectory = await mkdtemp(`${tmpdir()}/security-drive-`);
+  const temporaryFile = `${temporaryDirectory}/${file.name}`;
+  try {
+    await writeFile(temporaryFile, Buffer.from(await response.arrayBuffer()));
+    const { stdout } = await execFileAsync("unzip", [
+      "-p",
+      temporaryFile,
+      "word/document.xml",
+    ]);
+    const content = stdout
+      .replace(/<w:tab\s*\/?>(?=.)/g, "\t")
+      .replace(/<w:br\s*\/?>(?=.)/g, "\n")
+      .replace(/<\/w:p>/g, "\n")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+    return content || null;
+  } finally {
+    await rm(temporaryDirectory, { force: true, recursive: true });
+  }
+}
+
 async function listDriveTree(
   folderIds: string[],
   headers: HeadersInit
@@ -255,23 +306,14 @@ export async function syncGoogleDrive() {
     "application/json",
     "text/csv",
     "application/vnd.google-apps.document",
+    "application/vnd.google-apps.spreadsheet",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   ];
   const downloaded: (CanonicalSource | null)[] = await Promise.all(
     allFiles
       .filter((item) => allowedTypes.includes(item.mimeType))
       .map(async (file) => {
-        const path =
-          file.mimeType === "application/vnd.google-apps.document"
-            ? "/export?mimeType=text/plain"
-            : "?alt=media";
-        const response = await fetch(
-          `https://www.googleapis.com/drive/v3/files/${file.id}${path}`,
-          { cache: "no-store", headers }
-        );
-        if (!response.ok) {
-          return null;
-        }
-        const content = (await response.text()).trim();
+        const content = await downloadDriveContent(file, headers);
         return content
           ? {
               content,
