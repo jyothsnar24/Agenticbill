@@ -434,6 +434,20 @@ export async function saveConflict(
   await sql`INSERT INTO security_conflicts ${sql({ claim_ids: sql.json(claimIds), description, id: nanoid(16), question_id: questionId })}`;
 }
 
+export async function resolveConflicts(
+  questionId: string,
+  resolutionNote: string
+) {
+  await ensureSecuritySchema();
+  await sql`
+    UPDATE security_conflicts
+    SET resolution_status = 'resolved',
+        resolution_note = ${resolutionNote},
+        resolved_at = now()
+    WHERE question_id = ${questionId} AND resolution_status = 'open'
+  `;
+}
+
 export async function getConflicts() {
   await ensureSecuritySchema();
   return await sql`SELECT * FROM security_conflicts WHERE resolution_status = 'open' ORDER BY created_at DESC`;

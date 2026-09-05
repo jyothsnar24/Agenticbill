@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   getConflicts,
   getProfile,
+  resolveConflicts,
   saveClaim,
   saveConflict,
   saveUserFact,
@@ -72,7 +73,7 @@ export const syncCompanySources = tool({
 
 export const saveSecurityConfirmation = tool({
   description:
-    "Save a user's direct confirmation or correction for a security questionnaire question. Preserve existing evidence and classify this as user confirmed.",
+    "Save a user's direct confirmation or correction for a security questionnaire question. Preserve existing evidence, classify this as user confirmed, and resolve an open conflict when the confirmation has no missing details.",
   execute: async ({ questionId, answer, note, missingDetails }) => {
     const canonicalQuestionId = normalizeQuestionId(questionId);
     const question = getQuestion(canonicalQuestionId);
@@ -80,6 +81,12 @@ export const saveSecurityConfirmation = tool({
       return { error: "Unknown questionnaire question", saved: false };
     }
     await saveUserFact(canonicalQuestionId, answer, note);
+    if (missingDetails.length === 0) {
+      await resolveConflicts(
+        canonicalQuestionId,
+        note ?? "Resolved by the user's current confirmation."
+      );
+    }
     const claim = await saveClaim({
       answer,
       confidence: missingDetails.length > 0 ? 0.65 : 0.82,
