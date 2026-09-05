@@ -26,6 +26,14 @@ import { createDocument } from "@/lib/ai/tools/create-document";
 import { editDocument } from "@/lib/ai/tools/edit-document";
 import { getWeather } from "@/lib/ai/tools/get-weather";
 import { requestSuggestions } from "@/lib/ai/tools/request-suggestions";
+import {
+  getSecurityProfile,
+  recordSecurityConflict,
+  saveSecurityConfirmation,
+  saveVerifiedSecurityClaim,
+  searchCompanyKnowledge,
+  syncCompanySources,
+} from "@/lib/ai/tools/security";
 import { updateDocument } from "@/lib/ai/tools/update-document";
 import { isProductionEnvironment } from "@/lib/constants";
 import {
@@ -276,6 +284,12 @@ export async function POST(request: Request) {
                   "editDocument",
                   "updateDocument",
                   "requestSuggestions",
+                  "searchCompanyKnowledge",
+                  "getSecurityProfile",
+                  "syncCompanySources",
+                  "saveSecurityConfirmation",
+                  "saveVerifiedSecurityClaim",
+                  "recordSecurityConflict",
                 ],
           instructions: systemPrompt({ requestHints, supportsTools }),
           messages: modelMessages,
@@ -314,12 +328,18 @@ export async function POST(request: Request) {
               session,
             }),
             editDocument: editDocument({ dataStream, session }),
+            getSecurityProfile,
             getWeather,
+            recordSecurityConflict,
             requestSuggestions: requestSuggestions({
               dataStream,
               modelId: chatModel,
               session,
             }),
+            saveSecurityConfirmation,
+            saveVerifiedSecurityClaim,
+            searchCompanyKnowledge,
+            syncCompanySources,
             updateDocument: updateDocument({
               dataStream,
               modelId: chatModel,

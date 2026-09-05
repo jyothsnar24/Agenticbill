@@ -39,6 +39,50 @@ function WaitingText() {
   );
 }
 
+function SecurityToolOutput({ output }: { output: unknown }) {
+  if (!output) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Investigating company sources…
+      </p>
+    );
+  }
+  const value = output as {
+    results?: { sourceTitle?: string; excerpt?: string }[];
+    found?: boolean;
+  };
+  if (Array.isArray(value.results)) {
+    return (
+      <div className="space-y-2">
+        {value.results.length ? (
+          value.results.slice(0, 4).map((result) => (
+            <div
+              className="rounded-lg border bg-muted/30 p-2.5"
+              key={`${result.sourceTitle}-${result.excerpt}`}
+            >
+              <p className="text-xs font-medium">
+                {result.sourceTitle ?? "Company source"}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {result.excerpt}
+              </p>
+            </div>
+          ))
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            No matching company evidence was found.
+          </p>
+        )}
+      </div>
+    );
+  }
+  return (
+    <pre className="max-h-48 overflow-auto whitespace-pre-wrap text-xs text-muted-foreground">
+      {JSON.stringify(output, null, 2)}
+    </pre>
+  );
+}
+
 function ToolApprovalActions({
   addToolApprovalResponse,
   approvalId,
@@ -252,6 +296,47 @@ const PurePreviewMessage = ({
             </ToolContent>
           </Tool>
         </div>
+      );
+    }
+
+    if (
+      [
+        "tool-searchCompanyKnowledge",
+        "tool-getSecurityProfile",
+        "tool-syncCompanySources",
+        "tool-saveSecurityConfirmation",
+        "tool-saveVerifiedSecurityClaim",
+        "tool-recordSecurityConflict",
+      ].includes(type)
+    ) {
+      const securityPart = part as {
+        toolCallId: string;
+        state: string;
+        input?: unknown;
+        output?: unknown;
+      };
+      return (
+        <Tool
+          className="w-[min(100%,520px)]"
+          defaultOpen={securityPart.state === "output-available"}
+          key={securityPart.toolCallId}
+        >
+          <ToolHeader
+            state={securityPart.state as never}
+            type={type as `tool-${string}`}
+          />
+          <ToolContent>
+            {securityPart.state === "input-available" && (
+              <ToolInput input={securityPart.input} />
+            )}
+            {securityPart.state === "output-available" && (
+              <ToolOutput
+                errorText={undefined}
+                output={<SecurityToolOutput output={securityPart.output} />}
+              />
+            )}
+          </ToolContent>
+        </Tool>
       );
     }
 

@@ -19,6 +19,7 @@ import {
 } from "@/hooks/use-artifact";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { SecurityDashboard } from "../security/security-dashboard";
 import { Artifact } from "./artifact";
 import { ChatHeader } from "./chat-header";
 import { DataStreamHandler } from "./data-stream-handler";
@@ -186,6 +187,7 @@ export function ChatShell() {
           stop={stop}
           votes={votes}
         />
+        {!isArtifactVisible && <SecurityDashboard />}
       </div>
 
       <DataStreamHandler />

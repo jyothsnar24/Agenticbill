@@ -1,11 +1,11 @@
-export const DEFAULT_CHAT_MODEL = "moonshotai/kimi-k2.5";
+export const DEFAULT_CHAT_MODEL = "security-chat-advanced";
 
 export const titleModel = {
   description: "Fast model for title generation",
   gatewayOrder: ["fireworks", "bedrock"],
-  id: "moonshotai/kimi-k2.5",
-  name: "Kimi K2.5",
-  provider: "moonshotai",
+  id: "security-chat",
+  name: "Security Chat",
+  provider: "azure",
 };
 
 export type ModelCapabilities = {
@@ -25,47 +25,30 @@ export type ChatModel = {
 
 export const chatModels: ChatModel[] = [
   {
-    description: "Fast and capable model with tool use",
-    gatewayOrder: ["bedrock", "deepinfra"],
-    id: "deepseek/deepseek-v3.2",
-    name: "DeepSeek V3.2",
-    provider: "deepseek",
+    description: "Best available model for evidence analysis",
+    id: "security-chat-advanced",
+    name: "Security Analyst Pro",
+    provider: "azure",
   },
   {
-    description: "Moonshot AI flagship model",
-    gatewayOrder: ["fireworks", "bedrock"],
-    id: "moonshotai/kimi-k2.5",
-    name: "Kimi K2.5",
-    provider: "moonshotai",
-  },
-  {
-    description: "Compact reasoning model",
-    gatewayOrder: ["groq", "bedrock"],
-    id: "openai/gpt-oss-20b",
-    name: "GPT OSS 20B",
-    provider: "openai",
-    reasoningEffort: "low",
-  },
-  {
-    description: "Open-source 120B parameter model",
-    gatewayOrder: ["fireworks", "bedrock"],
-    id: "openai/gpt-oss-120b",
-    name: "GPT OSS 120B",
-    provider: "openai",
-    reasoningEffort: "low",
-  },
-  {
-    description: "Fast non-reasoning model with tool use",
-    gatewayOrder: ["xai"],
-    id: "xai/grok-4.1-fast-non-reasoning",
-    name: "Grok 4.1 Fast",
-    provider: "xai",
+    description: "Fast fallback model for local development",
+    id: "security-chat",
+    name: "Security Analyst Fast",
+    provider: "azure",
   },
 ];
 
 export async function getCapabilities(): Promise<
   Record<string, ModelCapabilities>
 > {
+  if (process.env.AZURE_OPENAI_ENDPOINT) {
+    return Object.fromEntries(
+      chatModels.map((model) => [
+        model.id,
+        { reasoning: false, tools: true, vision: false },
+      ])
+    );
+  }
   const results = await Promise.all(
     chatModels.map(async (model) => {
       try {
