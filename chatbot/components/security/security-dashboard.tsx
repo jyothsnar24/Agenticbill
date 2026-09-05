@@ -21,6 +21,7 @@ type ProfilePayload = {
   claims: SecurityClaim[];
   conflicts: { id: string; question_id: string; description: string }[];
   completion: number;
+  totalQuestions: number;
 };
 
 const statusCopy: Record<ClaimStatus | "empty", string> = {
@@ -191,7 +192,7 @@ export function SecurityDashboard() {
               {profile?.completion ?? 0}%
             </p>
             <p className="text-xs text-muted-foreground">
-              of 8 core controls ready
+              of {profile.totalQuestions} core controls ready
             </p>
           </div>
           <ShieldCheck className="size-8 text-primary/70" />

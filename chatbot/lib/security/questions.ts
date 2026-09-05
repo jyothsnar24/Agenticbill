@@ -587,10 +587,15 @@ export const FOCUSED_SECURITY_QUESTIONS: QuestionnaireQuestion[] = [
     requiredDetails: ["process", "timing", "owner", "device_handling"],
     text: "Do you have an employee offboarding process?",
   },
+];
+
+// Supplemental controls remain available to the analyst when an employee
+// asks about them, but are intentionally outside the seven-question export.
+export const SUPPLEMENTAL_SECURITY_QUESTIONS: QuestionnaireQuestion[] = [
   {
     category: "Personnel Security",
     id: "employee-background-checks",
-    order: 8,
+    order: 1,
     priority: "medium",
     requiredDetails: ["scope", "timing", "owner"],
     text: "Do you perform employee background checks?",
@@ -614,7 +619,9 @@ export function normalizeQuestionId(id: string) {
 
 export function getQuestion(id: string) {
   const canonicalId = normalizeQuestionId(id);
-  return [...FOCUSED_SECURITY_QUESTIONS, ...SECURITY_QUESTIONS].find(
-    (question) => question.id === canonicalId
-  );
+  return [
+    ...FOCUSED_SECURITY_QUESTIONS,
+    ...SUPPLEMENTAL_SECURITY_QUESTIONS,
+    ...SECURITY_QUESTIONS,
+  ].find((question) => question.id === canonicalId);
 }

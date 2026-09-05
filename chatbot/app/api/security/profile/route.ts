@@ -26,6 +26,7 @@ export async function GET() {
       ),
       conflicts,
       questions,
+      totalQuestions: FOCUSED_SECURITY_QUESTIONS.length,
     });
   } catch (error) {
     console.error("Security profile read failed", error);
