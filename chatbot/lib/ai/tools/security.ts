@@ -10,7 +10,10 @@ import {
   searchSecurityKnowledge,
 } from "@/lib/security/db";
 import { syncDemoSources } from "@/lib/security/ingestion";
-import { getQuestion } from "@/lib/security/questions";
+import {
+  normalizeQuestionId as canonicalizeQuestionId,
+  getQuestion,
+} from "@/lib/security/questions";
 import type { ClaimStatus, Evidence } from "@/lib/security/types";
 
 const evidenceSchema = z.object({
@@ -23,7 +26,7 @@ const evidenceSchema = z.object({
 });
 
 function normalizeQuestionId(questionId: string) {
-  return questionId.replaceAll("_", "-");
+  return canonicalizeQuestionId(questionId);
 }
 
 export const searchCompanyKnowledge = tool({

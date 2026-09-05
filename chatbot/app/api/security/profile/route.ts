@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getConflicts, getProfile } from "@/lib/security/db";
-import { SECURITY_QUESTIONS } from "@/lib/security/questions";
+import { FOCUSED_SECURITY_QUESTIONS } from "@/lib/security/questions";
 
 export async function GET() {
   try {
@@ -9,16 +9,21 @@ export async function GET() {
       getConflicts(),
     ]);
     const claimMap = new Map(claims.map((claim) => [claim.questionId, claim]));
-    const questions = SECURITY_QUESTIONS.map((question) => ({
+    const questions = FOCUSED_SECURITY_QUESTIONS.map((question) => ({
       ...question,
       claim: claimMap.get(question.id) ?? null,
     }));
-    const complete = claims.filter((claim) =>
+    const focusedClaims = questions.flatMap((question) =>
+      question.claim ? [question.claim] : []
+    );
+    const complete = focusedClaims.filter((claim) =>
       ["verified", "user_confirmed"].includes(claim.status)
     ).length;
     return NextResponse.json({
-      claims,
-      completion: Math.round((complete / SECURITY_QUESTIONS.length) * 100),
+      claims: focusedClaims,
+      completion: Math.round(
+        (complete / FOCUSED_SECURITY_QUESTIONS.length) * 100
+      ),
       conflicts,
       questions,
     });

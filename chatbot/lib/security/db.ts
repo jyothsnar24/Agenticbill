@@ -4,6 +4,7 @@ import { nanoid } from "nanoid";
 import postgres from "postgres";
 import { embedTexts } from "./embeddings";
 import { sha256 } from "./hash";
+import { normalizeQuestionId } from "./questions";
 import type {
   CanonicalSource,
   Evidence,
@@ -334,10 +335,14 @@ export async function saveClaim(
   input: Omit<SecurityClaim, "id" | "version" | "updatedAt">
 ) {
   await ensureSecuritySchema();
-  const [previous] =
-    await sql`SELECT id, version FROM security_claims WHERE question_id = ${input.questionId} AND is_current = true LIMIT 1`;
+  const questionId = normalizeQuestionId(input.questionId);
+  const currentClaims =
+    await sql`SELECT id, version, question_id FROM security_claims WHERE is_current = true`;
+  const previous = currentClaims.find(
+    (claim) => normalizeQuestionId(claim.question_id as string) === questionId
+  );
   if (previous) {
-    await sql`UPDATE security_claims SET is_current = false WHERE question_id = ${input.questionId} AND is_current = true`;
+    await sql`UPDATE security_claims SET is_current = false WHERE id = ${previous.id}`;
   }
   const id = nanoid(16);
   const version = previous ? Number(previous.version) + 1 : 1;
@@ -346,7 +351,7 @@ export async function saveClaim(
     confidence: input.confidence,
     id,
     missing_details: sql.json(input.missingDetails),
-    question_id: input.questionId,
+    question_id: questionId,
     scope: input.scope ?? null,
     status: input.status,
     supersedes_id: previous?.id ?? null,
@@ -366,7 +371,13 @@ export async function saveClaim(
         })}`
     )
   );
-  return { ...input, id, updatedAt: new Date().toISOString(), version };
+  return {
+    ...input,
+    id,
+    questionId,
+    updatedAt: new Date().toISOString(),
+    version,
+  };
 }
 
 export async function getProfile() {
@@ -406,9 +417,11 @@ export async function getProfile() {
     evidence: (row.evidence ?? []) as Evidence[],
     id: row.id as string,
     missingDetails: (row.missing_details ?? []) as string[],
-    questionId: row.question_id as string,
+    questionId: normalizeQuestionId(row.question_id as string),
     scope: row.scope as string | undefined,
-    status: conflictedQuestionIds.has(row.question_id as string)
+    status: conflictedQuestionIds.has(
+      normalizeQuestionId(row.question_id as string)
+    )
       ? "conflict"
       : (row.status as SecurityClaim["status"]),
     updatedAt: new Date(row.updated_at as string).toISOString(),
@@ -422,7 +435,7 @@ export async function saveUserFact(
   note?: string
 ) {
   await ensureSecuritySchema();
-  await sql`INSERT INTO security_user_facts ${sql({ answer: sql.json(answer as any), id: nanoid(16), note: note ?? null, question_id: questionId })}`;
+  await sql`INSERT INTO security_user_facts ${sql({ answer: sql.json(answer as any), id: nanoid(16), note: note ?? null, question_id: normalizeQuestionId(questionId) })}`;
 }
 
 export async function saveConflict(
@@ -431,7 +444,7 @@ export async function saveConflict(
   claimIds: string[]
 ) {
   await ensureSecuritySchema();
-  await sql`INSERT INTO security_conflicts ${sql({ claim_ids: sql.json(claimIds), description, id: nanoid(16), question_id: questionId })}`;
+  await sql`INSERT INTO security_conflicts ${sql({ claim_ids: sql.json(claimIds), description, id: nanoid(16), question_id: normalizeQuestionId(questionId) })}`;
 }
 
 export async function resolveConflicts(
@@ -439,16 +452,33 @@ export async function resolveConflicts(
   resolutionNote: string
 ) {
   await ensureSecuritySchema();
+  const canonicalQuestionId = normalizeQuestionId(questionId);
   await sql`
     UPDATE security_conflicts
     SET resolution_status = 'resolved',
         resolution_note = ${resolutionNote},
         resolved_at = now()
-    WHERE question_id = ${questionId} AND resolution_status = 'open'
+    WHERE resolution_status = 'open'
+      AND replace(question_id, '_', '-') = ${canonicalQuestionId}
   `;
 }
 
 export async function getConflicts() {
   await ensureSecuritySchema();
-  return await sql`SELECT * FROM security_conflicts WHERE resolution_status = 'open' ORDER BY created_at DESC`;
+  const rows =
+    await sql`SELECT * FROM security_conflicts WHERE resolution_status = 'open' ORDER BY created_at DESC`;
+  const seen = new Set<string>();
+  return rows
+    .filter((row) => {
+      const questionId = normalizeQuestionId(row.question_id as string);
+      if (seen.has(questionId)) {
+        return false;
+      }
+      seen.add(questionId);
+      return true;
+    })
+    .map((row) => ({
+      ...row,
+      question_id: normalizeQuestionId(row.question_id as string),
+    }));
 }

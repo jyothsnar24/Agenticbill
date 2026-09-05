@@ -172,7 +172,7 @@ export function SecurityDashboard() {
               Security workspace
             </p>
             <h2 className="mt-1 text-lg font-semibold tracking-tight">
-              Evidence profile
+              Core control profile
             </h2>
           </div>
           <button
@@ -190,7 +190,9 @@ export function SecurityDashboard() {
             <p className="text-3xl font-semibold tracking-tight">
               {profile?.completion ?? 0}%
             </p>
-            <p className="text-xs text-muted-foreground">questionnaire ready</p>
+            <p className="text-xs text-muted-foreground">
+              of 8 core controls ready
+            </p>
           </div>
           <ShieldCheck className="size-8 text-primary/70" />
         </div>

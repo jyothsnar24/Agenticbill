@@ -215,15 +215,16 @@ export async function POST(request: Request) {
 
     const modelMessages = await convertToModelMessages(uiMessages);
 
-    const securityQuery = uiMessages
-      .filter((item) => item.role === "user")
-      .flatMap((item) =>
-        item.parts
-          .filter((part) => part.type === "text")
-          .map((part) => part.text)
-      )
-      .join(" ")
-      .slice(-2400);
+    const securityQuery =
+      uiMessages
+        .filter((item) => item.role === "user")
+        .flatMap((item) =>
+          item.parts
+            .filter((part) => part.type === "text")
+            .map((part) => part.text)
+        )
+        .at(-1)
+        ?.slice(-2400) ?? "";
     const isSecurityQuestion =
       /mfa|multi-factor|customer data|encrypt|backup|vulnerability|production|offboard|background check|security questionnaire/i.test(
         securityQuery

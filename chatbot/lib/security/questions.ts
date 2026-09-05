@@ -526,6 +526,95 @@ export const SECURITY_QUESTIONS: QuestionnaireQuestion[] = [
   },
 ];
 
+// The hackathon demo is an investigation into the controls called out in the
+// brief. Keep the full vendor question bank available for future expansion,
+// but make the analyst workspace and export answer the questions that matter
+// to this workflow instead of rendering every unrelated vendor field.
+export const FOCUSED_SECURITY_QUESTIONS: QuestionnaireQuestion[] = [
+  {
+    category: "Identity & Access",
+    id: "mfa-enabled",
+    order: 1,
+    priority: "high",
+    requiredDetails: ["systems", "scope", "current_state"],
+    text: "Is MFA enabled for workforce and privileged access?",
+  },
+  {
+    category: "Data Security",
+    id: "customer-data-storage-location",
+    order: 2,
+    priority: "high",
+    requiredDetails: ["systems", "scope", "location"],
+    text: "Where is customer data stored?",
+  },
+  {
+    category: "Data Security",
+    id: "customer-data-encryption-at-rest",
+    order: 3,
+    priority: "high",
+    requiredDetails: ["systems", "scope", "algorithm_or_provider"],
+    text: "Is customer data encrypted at rest?",
+  },
+  {
+    category: "Business Continuity",
+    id: "backups-performed",
+    order: 4,
+    priority: "high",
+    requiredDetails: ["performed", "frequency", "automation", "retention"],
+    text: "How often are backups performed, and are they automated?",
+  },
+  {
+    category: "Vulnerability Management",
+    id: "vulnerability-scans-performed",
+    order: 5,
+    priority: "high",
+    requiredDetails: ["performed", "frequency", "scope"],
+    text: "Do you conduct vulnerability scans?",
+  },
+  {
+    category: "Identity & Access",
+    id: "production-access",
+    order: 6,
+    priority: "high",
+    requiredDetails: ["people_or_roles", "approval", "logging"],
+    text: "Who has access to production systems?",
+  },
+  {
+    category: "Personnel Security",
+    id: "employee-offboarding",
+    order: 7,
+    priority: "high",
+    requiredDetails: ["process", "timing", "owner", "device_handling"],
+    text: "Do you have an employee offboarding process?",
+  },
+  {
+    category: "Personnel Security",
+    id: "employee-background-checks",
+    order: 8,
+    priority: "medium",
+    requiredDetails: ["scope", "timing", "owner"],
+    text: "Do you perform employee background checks?",
+  },
+];
+
+const QUESTION_ID_ALIASES: Record<string, string> = {
+  backups: "backups-performed",
+  "customer-data-encryption": "customer-data-encryption-at-rest",
+  "customer-data-storage": "customer-data-storage-location",
+  "employee-offboarding-process": "employee-offboarding",
+  "production-system-access": "production-access",
+  "vulnerability-scan": "vulnerability-scans-performed",
+  "vulnerability-scans": "vulnerability-scans-performed",
+};
+
+export function normalizeQuestionId(id: string) {
+  const normalizedId = id.trim().replaceAll("_", "-");
+  return QUESTION_ID_ALIASES[normalizedId] ?? normalizedId;
+}
+
 export function getQuestion(id: string) {
-  return SECURITY_QUESTIONS.find((question) => question.id === id);
+  const canonicalId = normalizeQuestionId(id);
+  return [...FOCUSED_SECURITY_QUESTIONS, ...SECURITY_QUESTIONS].find(
+    (question) => question.id === canonicalId
+  );
 }

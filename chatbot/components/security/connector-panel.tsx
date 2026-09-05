@@ -128,39 +128,41 @@ export function ConnectorPanel() {
         </p>
       ) : null}
       <div className="mt-3 space-y-2">
-        {connectors.map((connector) => (
-          <div
-            className="flex items-start gap-2 rounded-lg bg-muted/35 px-2.5 py-2"
-            key={connector.id}
-          >
-            <span className="mt-0.5 text-muted-foreground">
-              {connector.mode === "ready" ? (
-                <Check className="size-3.5 text-emerald-600" />
-              ) : connector.mode === "demo" ? (
-                <CloudUpload className="size-3.5 text-sky-600" />
-              ) : (
-                <CircleDashed className="size-3.5" />
-              )}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-xs font-medium">
-                {connector.name}
+        {connectors
+          .filter((connector) => connector.mode !== "needs_setup")
+          .map((connector) => (
+            <div
+              className="flex items-start gap-2 rounded-lg bg-muted/35 px-2.5 py-2"
+              key={connector.id}
+            >
+              <span className="mt-0.5 text-muted-foreground">
+                {connector.mode === "ready" ? (
+                  <Check className="size-3.5 text-emerald-600" />
+                ) : connector.mode === "demo" ? (
+                  <CloudUpload className="size-3.5 text-sky-600" />
+                ) : (
+                  <CircleDashed className="size-3.5" />
+                )}
               </span>
-              <span className="block text-[10px] text-muted-foreground">
-                {modeCopy[connector.mode]} ·{" "}
-                {connector.readOnly ? "read-only" : ""}
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-medium">
+                  {connector.name}
+                </span>
+                <span className="block text-[10px] text-muted-foreground">
+                  {modeCopy[connector.mode]} ·{" "}
+                  {connector.readOnly ? "read-only" : ""}
+                </span>
+                {connector.connectUrl && connector.mode !== "connected" ? (
+                  <a
+                    className="mt-1 inline-block text-[10px] font-medium text-foreground underline underline-offset-2"
+                    href={connector.connectUrl}
+                  >
+                    Connect
+                  </a>
+                ) : null}
               </span>
-              {connector.connectUrl && connector.mode !== "connected" ? (
-                <a
-                  className="mt-1 inline-block text-[10px] font-medium text-foreground underline underline-offset-2"
-                  href={connector.connectUrl}
-                >
-                  Connect
-                </a>
-              ) : null}
-            </span>
-          </div>
-        ))}
+            </div>
+          ))}
       </div>
       <input
         accept=".csv,.json,.log,.md,.txt"
