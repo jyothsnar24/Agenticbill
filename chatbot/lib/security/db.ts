@@ -36,10 +36,12 @@ export function ensureSecuritySchema() {
       reliability text NOT NULL,
       content_hash text NOT NULL,
       metadata_hash text NOT NULL,
+      metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
       version integer NOT NULL DEFAULT 1,
       is_current boolean NOT NULL DEFAULT true,
       created_at timestamptz NOT NULL DEFAULT now()
     )`;
+    await sql`ALTER TABLE security_sources ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb`;
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS security_sources_current_external_idx
       ON security_sources (external_id) WHERE is_current = true`;
     await sql`CREATE TABLE IF NOT EXISTS security_chunks (
@@ -50,6 +52,7 @@ export function ensureSecuritySchema() {
       chunk_hash text NOT NULL,
       embedding vector(1536),
       embedding_model text,
+      metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
       source_type text NOT NULL,
       title text NOT NULL,
       scope text,
@@ -58,6 +61,7 @@ export function ensureSecuritySchema() {
       is_current boolean NOT NULL DEFAULT true,
       created_at timestamptz NOT NULL DEFAULT now()
     )`;
+    await sql`ALTER TABLE security_chunks ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb`;
     await sql`CREATE INDEX IF NOT EXISTS security_chunks_fts_idx ON security_chunks USING gin (to_tsvector('english', content))`;
     await sql`CREATE INDEX IF NOT EXISTS security_chunks_current_idx ON security_chunks (is_current, source_type)`;
     await sql`CREATE TABLE IF NOT EXISTS security_claims (
@@ -121,6 +125,7 @@ export async function upsertSource(
     reliability: source.reliability,
     scope: source.scope,
     sourceDate: source.sourceDate,
+    sourceMetadata: source.metadata,
     sourceType: source.sourceType,
     title: source.title,
   });
@@ -131,6 +136,17 @@ export async function upsertSource(
     current.content_hash === contentHash &&
     current.metadata_hash === metadataHash
   ) {
+    await Promise.all(
+      chunks.flatMap((chunk, index) => {
+        if (!chunk.embedding) {
+          return [];
+        }
+        const embedding = sql.unsafe(`'${toVector(chunk.embedding)}'::vector`);
+        return [
+          sql`UPDATE security_chunks SET embedding = ${embedding}, embedding_model = ${process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT ?? "text-embedding-3-small"} WHERE source_id = ${current.id} AND chunk_index = ${index} AND embedding IS NULL`,
+        ];
+      })
+    );
     return { changed: false, sourceId: current.id as string };
   }
   const sourceId = nanoid(16);
@@ -151,6 +167,7 @@ export async function upsertSource(
       : null,
     external_id: source.externalId,
     id: sourceId,
+    metadata: sql.json((source.metadata ?? {}) as any),
     metadata_hash: metadataHash,
     reliability: source.reliability,
     scope: source.scope ?? null,
@@ -165,8 +182,8 @@ export async function upsertSource(
       const embedding = chunk.embedding
         ? sql.unsafe(`'${toVector(chunk.embedding)}'::vector`)
         : sql`NULL`;
-      await sql`INSERT INTO security_chunks (id, source_id, chunk_index, content, chunk_hash, embedding, embedding_model, source_type, title, scope, reliability, source_date)
-      VALUES (${nanoid(16)}, ${sourceId}, ${index}, ${chunk.content}, ${chunkHash}, ${embedding}, ${chunk.embedding ? (process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT ?? "text-embedding-3-small") : null}, ${source.sourceType}, ${source.title}, ${source.scope ?? null}, ${source.reliability}, ${source.sourceDate ? new Date(source.sourceDate) : null})`;
+      await sql`INSERT INTO security_chunks (id, source_id, chunk_index, content, chunk_hash, embedding, embedding_model, metadata, source_type, title, scope, reliability, source_date)
+      VALUES (${nanoid(16)}, ${sourceId}, ${index}, ${chunk.content}, ${chunkHash}, ${embedding}, ${chunk.embedding ? (process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT ?? "text-embedding-3-small") : null}, ${sql.json((source.metadata ?? {}) as any)}, ${source.sourceType}, ${source.title}, ${source.scope ?? null}, ${source.reliability}, ${source.sourceDate ? new Date(source.sourceDate) : null})`;
     })
   );
   return { changed: true, sourceId };
@@ -189,17 +206,21 @@ export async function searchSecurityKnowledge(
     : null;
   const rows = vector
     ? await sql`
-    SELECT c.id AS chunk_id, c.content, c.title AS source_title, c.source_type, c.scope,
+    SELECT c.id AS chunk_id, c.content, c.metadata, c.title AS source_title, c.source_type, c.scope,
       c.reliability, c.source_date, c.source_id,
-      (1 - (c.embedding <=> ${vector})) AS score
+      GREATEST(
+        COALESCE(1 - (c.embedding <=> ${vector}), 0),
+        ts_rank_cd(to_tsvector('english', c.content), plainto_tsquery('english', ${query}))
+      ) AS score
     FROM security_chunks c
-    WHERE c.is_current = true AND c.embedding IS NOT NULL
+    WHERE c.is_current = true
+      AND (c.embedding IS NOT NULL OR to_tsvector('english', c.content) @@ plainto_tsquery('english', ${query}))
       AND (${types}::text[] IS NULL OR c.source_type = ANY(${types}::text[]))
       AND (${filters.scope ?? null}::text IS NULL OR c.scope ILIKE ${filters.scope ? `%${filters.scope}%` : null})
     ORDER BY score DESC, c.source_date DESC NULLS LAST
     LIMIT 12`
     : await sql`
-    SELECT c.id AS chunk_id, c.content, c.title AS source_title, c.source_type, c.scope,
+    SELECT c.id AS chunk_id, c.content, c.metadata, c.title AS source_title, c.source_type, c.scope,
       c.reliability, c.source_date, c.source_id,
       ts_rank_cd(to_tsvector('english', c.content), plainto_tsquery('english', ${query})) AS score
     FROM security_chunks c
@@ -214,6 +235,7 @@ export async function searchSecurityKnowledge(
     content: row.content as string,
     excerpt: row.content as string,
     id: row.chunk_id as string,
+    metadata: (row.metadata ?? {}) as Record<string, unknown>,
     relevance: Number(row.score ?? 0),
     reliability: row.reliability as Evidence["reliability"],
     scope: row.scope as string | undefined,

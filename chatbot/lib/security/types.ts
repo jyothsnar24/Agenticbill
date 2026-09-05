@@ -39,6 +39,7 @@ export type Evidence = {
   sourceDate?: string;
   reliability: Reliability;
   relevance: number;
+  metadata?: Record<string, unknown>;
 };
 
 export type SecurityClaim = {

@@ -190,7 +190,14 @@ export async function syncSlack() {
       ];
     })
   );
-  const results = await Promise.all(sources.map(ingestSource));
+  const results = await sources.reduce(
+    async (promise, source) => {
+      const completed = await promise;
+      completed.push(await ingestSource(source));
+      return completed;
+    },
+    Promise.resolve([] as Awaited<ReturnType<typeof ingestSource>>[])
+  );
   return {
     changed: results.filter((result) => result.changed).length,
     connectorId: "slack",
@@ -335,7 +342,14 @@ export async function syncGoogleDrive() {
   const sources = downloaded.filter(
     (source): source is CanonicalSource => source !== null
   );
-  const results = await Promise.all(sources.map(ingestSource));
+  const results = await sources.reduce(
+    async (promise, source) => {
+      const completed = await promise;
+      completed.push(await ingestSource(source));
+      return completed;
+    },
+    Promise.resolve([] as Awaited<ReturnType<typeof ingestSource>>[])
+  );
   return {
     changed: results.filter((result) => result.changed).length,
     connectorId: "google-drive",
