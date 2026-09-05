@@ -105,6 +105,26 @@ export async function saveGoogleDriveRefreshToken(token: string) {
   });
 }
 
+export async function disconnectGoogleDrive() {
+  const cookieStore = await cookies();
+  const refreshToken = cookieStore.get(GOOGLE_DRIVE_REFRESH_COOKIE)?.value;
+  let remoteRevoked = !refreshToken;
+
+  if (refreshToken) {
+    const response = await fetch("https://oauth2.googleapis.com/revoke", {
+      body: new URLSearchParams({ token: refreshToken }),
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      method: "POST",
+    });
+    remoteRevoked = response.ok;
+  }
+
+  cookieStore.delete(GOOGLE_DRIVE_REFRESH_COOKIE);
+  cookieStore.delete(GOOGLE_DRIVE_STATE_COOKIE);
+
+  return { localCleared: true, remoteRevoked };
+}
+
 async function getGoogleDriveAccessToken() {
   const directToken = process.env.GOOGLE_DRIVE_ACCESS_TOKEN?.trim();
   if (directToken) {

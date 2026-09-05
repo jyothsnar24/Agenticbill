@@ -82,6 +82,27 @@ export function ConnectorPanel() {
     [load]
   );
 
+  const disconnect = useCallback(async () => {
+    setSyncing(true);
+    try {
+      const response = await fetch("/api/security/google-drive/disconnect", {
+        method: "POST",
+      });
+      if (!response.ok) {
+        throw new Error("Google Drive disconnect failed");
+      }
+      await load();
+    } catch {
+      setError("Google Drive disconnect failed. Try again.");
+    } finally {
+      setSyncing(false);
+    }
+  }, [load]);
+
+  const handleDisconnect = useCallback(() => {
+    disconnect().catch(() => undefined);
+  }, [disconnect]);
+
   const handleSync = useCallback(() => {
     sync().catch(() => undefined);
   }, [sync]);
@@ -159,6 +180,16 @@ export function ConnectorPanel() {
                   >
                     Connect
                   </a>
+                ) : null}
+                {connector.disconnectUrl && connector.mode === "connected" ? (
+                  <button
+                    className="mt-1 block text-[10px] font-medium text-foreground underline underline-offset-2"
+                    disabled={syncing}
+                    onClick={handleDisconnect}
+                    type="button"
+                  >
+                    Disconnect
+                  </button>
                 ) : null}
               </span>
             </div>

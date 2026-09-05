@@ -27,6 +27,7 @@ export type ConnectorStatus = {
   readOnly: true;
   detail: string;
   connectUrl?: string;
+  disconnectUrl?: string;
 };
 
 export const CONNECTORS: ConnectorStatus[] = [
@@ -82,11 +83,27 @@ export const CONNECTORS: ConnectorStatus[] = [
 ];
 
 export function getConnectorStatuses(googleDriveConnected = false) {
-  return CONNECTORS.map((connector) =>
-    connector.id === "google-drive" && googleDriveConnected
-      ? { ...connector, detail: "Connected", mode: "connected" as const }
-      : connector
-  );
+  return CONNECTORS.map((connector) => {
+    if (connector.id !== "google-drive") {
+      return connector;
+    }
+    if (googleDriveConnected) {
+      return {
+        ...connector,
+        detail: "Connected",
+        disconnectUrl: "/api/security/google-drive/disconnect",
+        mode: "connected" as const,
+      };
+    }
+    return {
+      ...connector,
+      connectUrl: isGoogleDriveOAuthConfigured()
+        ? "/api/security/google-drive/connect"
+        : undefined,
+      detail: "OAuth connection required",
+      mode: "needs_setup" as const,
+    };
+  });
 }
 
 export { isGoogleDriveConnected } from "./live-connectors";

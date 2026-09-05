@@ -9,6 +9,12 @@ template; everything below this point is inherited setup/run documentation
 from that template and is still accurate for getting the app running
 locally.
 
+## Security Analyst documentation
+
+The product architecture, evidence model, RAG pipeline, connector lifecycle,
+prompt safety rules, test state, and teardown checklist are documented in
+[docs/SECURITY_ANALYST_ARCHITECTURE.md](docs/SECURITY_ANALYST_ARCHITECTURE.md).
+
 ## Features
 
 - [Next.js](https://nextjs.org) App Router
