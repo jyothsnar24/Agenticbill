@@ -50,6 +50,11 @@ PostgreSQL. A future production version could move the workflow into LangGraph
 if it needs durable multi-agent plans, human approval checkpoints, or long-lived
 background investigations.
 
+Azure provisioning and teardown commands are maintained in
+[AZURE_SETUP_TEARDOWN.md](AZURE_SETUP_TEARDOWN.md). The documented demo
+resources are the dedicated `hackathon-ai-rg` resource group, its Azure OpenAI
+account, and its PostgreSQL Flexible Server.
+
 ## Evidence and RAG pipeline
 
 All source types use the same ingestion contract:
@@ -130,21 +135,13 @@ positive answer.
 
 ## Last verified demo state
 
-The final browser verification showed:
-
-- seven controls in the profile;
-- four verified, one partial, one conflict, and one unknown;
-- cited answers for backups, encryption, production access, and offboarding;
-- a focused clarification for vulnerability scans;
-- conflict investigation for MFA;
-- no application error or message-limit banner;
-- Google Drive connected and connector synchronization completing in the UI.
-
-The last database audit contained 45 current sources and 927 current chunks.
-At that moment 748 chunks had embeddings and 179 were waiting for embedding.
-The backfill failed with HTTP 401 from the configured Azure embedding endpoint.
-This means keyword retrieval still works, but semantic RAG is incomplete until
-the embedding deployment and API key belong to the same Azure resource.
+The latest database audit before teardown contained 37 current sources,
+including 19 Google Drive sources, and 919 current chunks. All current chunks
+had embeddings. The profile contained evidence for backups, MFA, and background
+checks, and no unresolved test conflict remained after cleanup. The current
+Azure deployment names and cleanup procedure are intentionally kept in the
+[Azure runbook](AZURE_SETUP_TEARDOWN.md), rather than in this historical demo
+summary.
 
 ## Local setup
 
@@ -172,17 +169,10 @@ pnpm test
 
 After the hackathon:
 
-1. Delete only the dedicated Azure resource group created for this project.
-2. Revoke Google OAuth access for the connected account in Google Account
-   security settings, and clear the app's refresh-token cookie.
-3. Remove local `.env.local` values and any temporary OAuth state.
-4. Keep the GitHub documentation and source code; do not keep provider keys.
+1. Push the source and documentation to GitHub.
+2. Disconnect Google Drive from the app and remove the app from the connected
+   Google account's third-party access list if it remains there.
+3. Delete only `hackathon-ai-rg` after checking its resource list.
+4. Remove local secrets and, if desired, the local project folder.
 
-## Teardown record
-
-- The dedicated Azure resource group `hackathon-ai-rg` and its hackathon
-  resources were deleted after the demo.
-- The Google Drive disconnect workflow is implemented at
-  `/api/security/google-drive/disconnect`; it revokes the current OAuth grant
-  and clears the local connector cookies when triggered from the connected
-  browser.
+Follow the detailed [Azure setup and teardown runbook](AZURE_SETUP_TEARDOWN.md).

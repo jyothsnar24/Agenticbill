@@ -14,6 +14,8 @@ locally.
 The product architecture, evidence model, RAG pipeline, connector lifecycle,
 prompt safety rules, test state, and teardown checklist are documented in
 [docs/SECURITY_ANALYST_ARCHITECTURE.md](docs/SECURITY_ANALYST_ARCHITECTURE.md).
+Azure provisioning, verification, and teardown are documented in
+[docs/AZURE_SETUP_TEARDOWN.md](docs/AZURE_SETUP_TEARDOWN.md).
 
 ## Features
 

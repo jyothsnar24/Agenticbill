@@ -23,6 +23,11 @@ const configuredChatEndpoint =
     ? process.env.AZURE_OPENAI_CHAT_DEPLOYMENT
     : undefined;
 
+const azureChatDeployment =
+  process.env.AZURE_OPENAI_CHAT_DEPLOYMENT?.startsWith("http")
+    ? "model-router"
+    : (process.env.AZURE_OPENAI_CHAT_DEPLOYMENT ?? "model-router");
+
 const azureEndpoint = (
   configuredChatEndpoint ?? process.env.AZURE_OPENAI_ENDPOINT
 )
@@ -45,7 +50,7 @@ export function getLanguageModel(modelId: string) {
   }
 
   if (azure) {
-    return azure.chat("model-router");
+    return azure.chat(azureChatDeployment);
   }
 
   return gateway.languageModel(modelId);
@@ -56,7 +61,7 @@ export function getTitleModel() {
     return myProvider.languageModel("title-model");
   }
   if (azure) {
-    return azure.chat("model-router");
+    return azure.chat(azureChatDeployment);
   }
   return gateway.languageModel(titleModel.id);
 }

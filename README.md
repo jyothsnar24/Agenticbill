@@ -191,3 +191,6 @@ reports, access review records, and the asset inventory, lives under
 
 See [`chatbot/README.md`](./chatbot/README.md) for setup (env vars, database,
 `pnpm install && pnpm dev`).
+
+For reproducible Azure provisioning, verification, and safe teardown, see the
+[Azure setup and teardown runbook](./chatbot/docs/AZURE_SETUP_TEARDOWN.md).
